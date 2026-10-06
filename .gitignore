@@ -6,6 +6,7 @@ dist/
 wheels/
 *.egg-info
 db_meta.json
+ascii/
 
 # Virtual environments
 .venv
