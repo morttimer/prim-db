@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from .model import DataBaseMetadata
 from .settings import DATA_DIR, METADATA_FILE_PATH
@@ -40,3 +41,8 @@ def save_table_data(table_name, data):
     """Сохраняет данные таблицы в JSON-файл."""
     with open(f"{DATA_DIR}/{table_name}.json", mode="w+", encoding="utf-8") as f:
         return json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def delete_table_data(table_name):
+    """Удаляет файл данных таблицы."""
+    Path(f"{DATA_DIR}/{table_name}.json").unlink(missing_ok=True)

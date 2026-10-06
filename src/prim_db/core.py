@@ -1,3 +1,4 @@
+from .decorators import confirm_action, log_time
 from .model import DataBaseMetadata
 
 
@@ -9,6 +10,7 @@ def create_table(metadata, table_name, columns):
     return metadata
 
 
+@confirm_action("удаление таблицы")
 def drop_table(metadata, table_name):
     """Удаляет таблицу из метаданных и возвращает их."""
     _check_metadata(metadata)
@@ -33,6 +35,7 @@ def info_table(metadata, table_data, table_name):
     print(f"Количество записей: {len(table_data) if table_data else 0}")
 
 
+@log_time
 def insert(metadata, table_name, table_data, values):
     """Добавляет запись в данные таблицы и возвращает их."""
     target_table = _get_table(metadata, table_name)
@@ -45,6 +48,7 @@ def insert(metadata, table_name, table_data, values):
     return table_data
 
 
+@confirm_action("удаление данных из таблицы")
 def delete(metadata, table_name, table_data, where):
     """Возвращает данные таблицы без записей, подходящих под условие."""
     target_table = _get_table(metadata, table_name)
@@ -70,6 +74,7 @@ def update(metadata, table_name, table_data, where_clause, set_clause):
     return table_data, modified
 
 
+@log_time
 def select(metadata, table_name, table_data, where_clause=None):
     """Возвращает записи таблицы, подходящие под условие."""
     target_table = _get_table(metadata, table_name)

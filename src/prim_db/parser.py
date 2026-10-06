@@ -14,7 +14,10 @@ from .core import (
     select,
     update,
 )
-from .utils import load_table_data, save_metadata, save_table_data
+from .decorators import create_cacher, handle_db_errors
+from .utils import delete_table_data, load_table_data, save_metadata, save_table_data
+
+_select_cache = create_cacher()
 
 
 class Command(ABC):
@@ -38,9 +41,14 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def execute(self, metadata) -> str:
+    def _execute(self, metadata) -> str:
         """Выполняет команду."""
         ...
+
+    @handle_db_errors
+    def execute(self, metadata) -> str:
+        """Выполняет команду."""
+        return self._execute(metadata)
 
     @classmethod
     @abstractmethod
@@ -76,8 +84,8 @@ class DDLCommand(Command):
     @staticmethod
     def _save_metadata(metadata):
         """Сохраняет метаданные базы данных."""
-        ...
         save_metadata(metadata)
+        _select_cache.clear()
 
 
 class DMLCommand(Command):
@@ -90,6 +98,7 @@ class DMLCommand(Command):
     def _save_table_data(table_name, data):
         """Сохраняет данные таблицы."""
         save_table_data(table_name, data)
+        _select_cache.clear()
 
     @staticmethod
     def _format_rows(table_metadata, rows):
@@ -139,7 +148,7 @@ class CreateTableCommand(DDLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return CreateTableCommand(args[1], tuple(args[2:]))
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Создает таблицу."""
         create_table(metadata, self._table_name, self._col_descriptions)
 
@@ -164,10 +173,11 @@ class DropTableCommand(DDLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return DropTableCommand(args[1])
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Удаляет таблицу."""
         drop_table(metadata, self._table_name)
         DDLCommand._save_metadata(metadata)
+        delete_table_data(self._table_name)
 
         return f"Таблица {self._table_name} успешно удалена"
 
@@ -184,7 +194,7 @@ class ListTablesCommand(DDLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return ListTablesCommand()
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Выводит список всех таблиц."""
         list_tables(metadata)
 
@@ -207,7 +217,7 @@ class InfoCommand(DMLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return InfoCommand(args[1])
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Выводит информацию о таблице."""
 
         info_table(metadata, self._load_table_data(self._table_name), self._table_name)
@@ -233,7 +243,7 @@ class InsertCommand(DMLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return InsertCommand(args[2], args[4])
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Добавляет запись в таблицу."""
         self._save_table_data(
             self._table_name,
@@ -289,15 +299,21 @@ class SelectCommand(DMLCommand):
         else:
             return SelectCommand(args[2], (args[4], args[6]))
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Выводит записи таблицы."""
+        return _select_cache(
+            (self._table_name, self._where_clause),
+            lambda: self._perform_select(metadata),
+        )
+
+    def _perform_select(self, metadata):
+        """Выбирает записи таблицы и форматирует их."""
         select_result = select(
             metadata,
             self._table_name,
             self._load_table_data(self._table_name),
             self._where_clause,
         )
-
         return self._format_rows(metadata.find_table(self._table_name), select_result)
 
     @classmethod
@@ -323,7 +339,7 @@ class UpdateCommand(DMLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return UpdateCommand(args[1], (args[3], args[5]), (args[7], args[9]))
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Обновляет записи таблицы."""
 
         table_data, modified_count = update(
@@ -361,7 +377,7 @@ class DeleteCommand(DMLCommand):
         """Создает команду из строки ввода или возвращает None."""
         return DeleteCommand(args[2], (args[4], args[6]))
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Удаляет записи таблицы."""
         table_data = self._load_table_data(self._table_name)
         delete_result = delete(
@@ -391,7 +407,7 @@ class HelpCommand(ServiceCommand):
         """Создает команду из строки ввода или возвращает None."""
         return HelpCommand()
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Выводит справку по командам."""
         print("\n***Процесс работы с таблицей***")
         print("Функции:")
@@ -441,7 +457,7 @@ class ExitCommand(ServiceCommand):
         """Создает команду из строки ввода или возвращает None."""
         return ExitCommand()
 
-    def execute(self, metadata):
+    def _execute(self, metadata):
         """Завершает работу программы."""
         exit(0)
 

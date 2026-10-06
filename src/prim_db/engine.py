@@ -20,7 +20,11 @@ def run():
                 print(f"Команды {raw_command} не существует. См. help")
                 continue
 
-            print(command.execute(metadata))
+            result = command.execute(metadata)
+
+            if result is not None:
+                print(result)
+
         except EOFError:
             exit(0)
         except KeyboardInterrupt:
