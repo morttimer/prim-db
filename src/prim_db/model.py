@@ -15,8 +15,7 @@ class DataBaseMetadata:
                     "Описание таблицы должно быть объектом класса TableMetadata"
                 )
 
-            same_name_tables = self._find_table(table.name)
-            if same_name_tables:
+            if self.find_table(table.name) is not None:
                 raise ValueError(
                     "Таблиц с одинаковым именем не должно существовать "
                     "в пределах одной базы данных"
@@ -39,16 +38,16 @@ class DataBaseMetadata:
 
     def drop_table_by_name(self, table_name):
         """Удаляет таблицу по имени."""
-        target_table = self._find_table(table_name)
+        target_table = self.find_table(table_name)
 
-        if not target_table:
+        if target_table is None:
             raise ValueError(f"Таблица с именем {table_name} не найдена")
 
-        self._tables = [t for t in self._tables if t not in target_table]
+        self._tables.remove(target_table)
 
     def create_table(self, table_name, column_desc):
         """Создает таблицу с заданными столбцами."""
-        if self._find_table(table_name):
+        if self.find_table(table_name) is not None:
             raise ValueError(f"Таблица с именем {table_name} уже существует")
 
         updated_col_desc = []
@@ -64,24 +63,15 @@ class DataBaseMetadata:
             TableMetadata(table_name, ColumnsMetadata.from_dict(updated_col_desc))
         )
 
-    def _find_table(self, table_name):
-        """Возвращает таблицы с заданным именем."""
-        return [t for t in self._tables if t.name == table_name]
+    def find_table(self, table_name):
+        """Возвращает таблицу с заданным именем."""
+        return next((t for t in self._tables if t.name == table_name), None)
 
     def list_tables(self):
         """Возвращает текстовое описание всех таблиц."""
         all_tables_info = []
-        all_tables_info.append("Все таблицы базы данных\n")
-        all_tables_info.append("-" * 4)
-        all_tables_info.append("\n")
         for t in self._tables:
-            col_list = t.columns.columns
-            all_tables_info.append(f"Название таблицы: {t.name}\n")
-            all_tables_info.append(
-                f"Столбцы таблицы: {[(col.name, col.type) for col in col_list]}\n"
-            )
-            all_tables_info.append("-" * 4)
-            all_tables_info.append("\n")
+            all_tables_info.append(f"{t.name}")
         return all_tables_info
 
 
@@ -116,6 +106,24 @@ class TableMetadata:
         """Преобразует метаданные таблицы в словарь."""
         return {"name": self._name, "columns": self._columns.to_dict()}
 
+    def convert_row(self, values):
+        """Преобразует значения строки к типам столбцов."""
+        data_columns = self._columns.columns[1:]
+        if len(values) != len(data_columns):
+            raise ValueError(
+                f"Ожидается значений: {len(data_columns)}, передано: {len(values)}"
+            )
+
+        return tuple(col.convert(v) for col, v in zip(data_columns, values))
+
+    def convert_value(self, col_name, raw_value):
+        """Преобразует значение к типу столбца с заданным именем."""
+        column = self._columns.find_by_name(col_name)
+        if column is None:
+            raise ValueError(f"Столбца с именем {col_name} не существует")
+
+        return column.convert(raw_value)
+
 
 class ColumnMetadata:
     def __init__(self, col_name, col_type):
@@ -146,6 +154,35 @@ class ColumnMetadata:
         """Преобразует метаданные столбца в словарь."""
         return {"name": self._name, "type": self._type}
 
+    def convert(self, raw_value):
+        """Преобразует значение из строки ввода к типу столбца."""
+        unquoted = ColumnMetadata._unquote(raw_value)
+
+        if self._type == "str" and unquoted is not None:
+            return unquoted
+
+        if self._type == "int" and unquoted is None:
+            try:
+                return int(raw_value)
+            except ValueError:
+                pass
+
+        if self._type == "bool" and raw_value.lower() in ("true", "false"):
+            return raw_value.lower() == "true"
+
+        raise ValueError(f"Некорректное значение: {raw_value}")
+
+    @staticmethod
+    def _unquote(raw_value):
+        """Возвращает значение без кавычек или None, если кавычек нет."""
+        if len(raw_value) < 2 or raw_value[0] not in ('"', "'"):
+            return None
+
+        if raw_value[-1] != raw_value[0]:
+            return None
+
+        return raw_value[1:-1]
+
 
 class ColumnsMetadata:
     def __init__(self, columns):
@@ -174,6 +211,10 @@ class ColumnsMetadata:
 
             self._columns.append(column)
 
+    def __len__(self):
+        """Возвращает количество столбцов."""
+        return len(self._columns)
+
     @property
     def columns(self):
         return tuple(self._columns)
@@ -186,3 +227,7 @@ class ColumnsMetadata:
     def to_dict(self):
         """Преобразует набор столбцов в список словарей."""
         return [c.to_dict() for c in self._columns]
+
+    def find_by_name(self, col_name):
+        """Возвращает столбец с заданным именем."""
+        return next((c for c in self._columns if c.name == col_name), None)

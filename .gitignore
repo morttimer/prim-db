@@ -7,6 +7,7 @@ wheels/
 *.egg-info
 db_meta.json
 ascii/
+data/
 
 # Virtual environments
 .venv

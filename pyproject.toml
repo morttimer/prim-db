@@ -7,6 +7,9 @@ authors = [
     { name = "kbobkov", email = "godmortt@yandex.ru" }
 ]
 requires-python = ">=3.12"
+dependencies = [
+    "prettytable>=3.18.0",
+]
 
 [project.scripts]
 prim-db = "prim_db.main:main"
