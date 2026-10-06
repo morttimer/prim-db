@@ -1,3 +1,4 @@
+from .constants import FIRST_ID, ID_COLUMN
 from .decorators import confirm_action, log_time
 from .model import DataBaseMetadata
 
@@ -114,9 +115,9 @@ def _convert_clause(target_table, clause):
 def _add_id_col(table_data, values):
     """Добавляет следующий ID в начало значений записи."""
     if not table_data:
-        next_id = 1
+        next_id = FIRST_ID
     else:
-        next_id = max([t["ID"] for t in table_data]) + 1
+        next_id = max([t[ID_COLUMN] for t in table_data]) + 1
 
     return (next_id,) + values
 

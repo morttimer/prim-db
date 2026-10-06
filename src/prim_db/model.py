@@ -1,5 +1,16 @@
 from typing import Iterable
 
+from .constants import (
+    BOOL_FALSE,
+    BOOL_TRUE,
+    ID_COLUMN,
+    QUOTE_CHARS,
+    TYPE_BOOL,
+    TYPE_INT,
+    TYPE_STR,
+    VALID_TYPES,
+)
+
 
 class DataBaseMetadata:
     def __init__(self, tables):
@@ -55,9 +66,10 @@ class DataBaseMetadata:
             splitted_col = col.split(":")
             updated_col_desc.append({"name": splitted_col[0], "type": splitted_col[1]})
 
-        id_column = [col for col in updated_col_desc if col["name"] == "ID"]
+        id_column = [col for col in updated_col_desc if col["name"] == ID_COLUMN]
         if not id_column:
-            updated_col_desc = [{"name": "ID", "type": "int"}, *updated_col_desc]
+            id_desc = {"name": ID_COLUMN, "type": TYPE_INT}
+            updated_col_desc = [id_desc, *updated_col_desc]
 
         self._tables.append(
             TableMetadata(table_name, ColumnsMetadata.from_dict(updated_col_desc))
@@ -131,8 +143,10 @@ class ColumnMetadata:
         if not isinstance(col_name, str):
             raise TypeError("Название столбца должно быть строкой")
 
-        if col_type not in ["int", "str", "bool"]:
-            raise ValueError("Тип столбца таблицы должен быть один из: int, str, bool")
+        if col_type not in VALID_TYPES:
+            raise ValueError(
+                f"Тип столбца таблицы должен быть один из: {', '.join(VALID_TYPES)}"
+            )
 
         self._name = col_name
         self._type = col_type
@@ -158,24 +172,24 @@ class ColumnMetadata:
         """Преобразует значение из строки ввода к типу столбца."""
         unquoted = ColumnMetadata._unquote(raw_value)
 
-        if self._type == "str" and unquoted is not None:
+        if self._type == TYPE_STR and unquoted is not None:
             return unquoted
 
-        if self._type == "int" and unquoted is None:
+        if self._type == TYPE_INT and unquoted is None:
             try:
                 return int(raw_value)
             except ValueError:
                 pass
 
-        if self._type == "bool" and raw_value.lower() in ("true", "false"):
-            return raw_value.lower() == "true"
+        if self._type == TYPE_BOOL and raw_value.lower() in (BOOL_TRUE, BOOL_FALSE):
+            return raw_value.lower() == BOOL_TRUE
 
         raise ValueError(f"Некорректное значение: {raw_value}")
 
     @staticmethod
     def _unquote(raw_value):
         """Возвращает значение без кавычек или None, если кавычек нет."""
-        if len(raw_value) < 2 or raw_value[0] not in ('"', "'"):
+        if len(raw_value) < 2 or raw_value[0] not in QUOTE_CHARS:
             return None
 
         if raw_value[-1] != raw_value[0]:

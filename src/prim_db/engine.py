@@ -1,11 +1,12 @@
 from sys import exit
 
 from .parser import CommandRegistry, HelpCommand
-from .utils import load_metadata
+from .utils import init_metadata, load_metadata
 
 
 def run():
     """Запускает основной цикл обработки команд."""
+    init_metadata()
     metadata = load_metadata()
     HelpCommand().execute(metadata)
 

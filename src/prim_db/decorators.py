@@ -1,6 +1,7 @@
 from functools import wraps
 from time import monotonic_ns
 
+from .constants import CONFIRM_ANSWER, NANOSECONDS_IN_SECOND
 from .exceptions import UserRejectedCommandError
 
 
@@ -34,7 +35,7 @@ def confirm_action(action_name):
         @wraps(func)
         def wrapper(*args, **kwargs):
             answer = input(f'Вы уверены, что хотите выполнить "{action_name}"? [y/n]: ')
-            if answer != "y":
+            if answer != CONFIRM_ANSWER:
                 raise UserRejectedCommandError("Пользователь отменил команду")
             else:
                 return func(*args, **kwargs)
@@ -51,7 +52,7 @@ def log_time(func):
     def wrapper(*args, **kwargs):
         time_before = monotonic_ns()
         result = func(*args, **kwargs)
-        elapsed = (monotonic_ns() - time_before) / 10**9
+        elapsed = (monotonic_ns() - time_before) / NANOSECONDS_IN_SECOND
         print(f'Функция "{func.__name__}" выполнилась за {elapsed:.3f} секунд')
         return result
 
